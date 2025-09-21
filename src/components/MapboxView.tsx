@@ -81,6 +81,26 @@ const MapboxView: React.FC = () => {
     map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), "top-right");
 
     map.on("load", () => {
+      // Helper to create a truck SVG marker element (no external URL deps)
+      const createTruckElement = (size = 40) => {
+        const el = document.createElement("div");
+        el.style.width = `${size}px`;
+        el.style.height = `${size}px`;
+        el.style.display = "block";
+        el.style.transform = "translate(-50%, -50%)";
+        el.innerHTML = `
+          <svg width="${size}" height="${size}" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <g fill="none" fill-rule="evenodd">
+              <rect x="4" y="22" width="34" height="18" rx="3" fill="#2D9CDB"/>
+              <path d="M38 26h10l7 8v6H38z" fill="#F2C94C"/>
+              <circle cx="18" cy="44" r="6" fill="#333"/>
+              <circle cx="18" cy="44" r="3" fill="#EEE"/>
+              <circle cx="46" cy="44" r="6" fill="#333"/>
+              <circle cx="46" cy="44" r="3" fill="#EEE"/>
+            </g>
+          </svg>`;
+        return el;
+      };
       // Add hazard points source
       if (!map.getSource("hazards")) {
         map.addSource("hazards", {
@@ -115,30 +135,25 @@ const MapboxView: React.FC = () => {
         });
       }
 
-      // Add starting point marker
-      new mapboxgl.Marker({ color: "#3FB1CE" })
+      // Always show a truck marker at starting point (fallback for production)
+      const startingTruckEl = createTruckElement(36);
+      new mapboxgl.Marker({ element: startingTruckEl, anchor: "center" })
         .setLngLat([startingPoint.lng, startingPoint.lat])
         .addTo(map);
 
-      // Attempt to get current location and show truck icon similar to Google Maps
+      // Attempt to get current location and show an additional truck marker
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const { latitude, longitude } = pos.coords;
-            const el = document.createElement("div");
-            el.style.width = "40px";
-            el.style.height = "40px";
-            el.style.backgroundImage =
-              "url('https://cdn-icons-png.flaticon.com/512/1048/1048329.png')";
-            el.style.backgroundSize = "contain";
-            el.style.backgroundRepeat = "no-repeat";
-
-            new mapboxgl.Marker({ element: el })
+            const geoTruckEl = createTruckElement(36);
+            new mapboxgl.Marker({ element: geoTruckEl, anchor: "center" })
               .setLngLat([longitude, latitude])
               .addTo(map);
+            map.flyTo({ center: [longitude, latitude], zoom: 14, essential: true });
           },
           () => {
-            // ignore errors silently
+            // If geolocation fails, we already have the starting point truck visible.
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
