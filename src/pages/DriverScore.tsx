@@ -85,21 +85,24 @@ export default function DriverDetailsPage() {
 
   // useEffect to poll metrics from data.json every second
   useEffect(() => {
+    const dataUrl = (import.meta as any)?.env?.VITE_DATA_JSON_URL as string | undefined;
+    if (!dataUrl) {
+      // No data URL configured; skip polling in development to avoid errors.
+      return;
+    }
+
     const fetchDriverMetrics = async () => {
       try {
-        const response = await fetch("/data.json");
+        const response = await fetch(dataUrl, { cache: "no-store" });
+        if (!response.ok) return; // silently ignore non-200s
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) return; // avoid parsing HTML error pages
         const data = await response.json();
-        if (data.hb !== undefined) {
-          setHardBrake(data.hb);
-        }
-        if (data.ra !== undefined) {
-          setRapidAcceleration(data.ra);
-        }
-        if (data.mts !== undefined) {
-          setMaxTurnableSpeed(data.mts);
-        }
-      } catch (error) {
-        console.error("Error fetching metrics from data.json:", error);
+        if (data.hb !== undefined) setHardBrake(data.hb);
+        if (data.ra !== undefined) setRapidAcceleration(data.ra);
+        if (data.mts !== undefined) setMaxTurnableSpeed(data.mts);
+      } catch {
+        // suppress fetch/parse errors to avoid noisy console
       }
     };
 
@@ -195,62 +198,58 @@ export default function DriverDetailsPage() {
 
 
   // useEffect to open a WebSocket connection and update gyro/accel in real time
-   useEffect(() => {
-      const wsHost = window.location.hostname; // Get the current hostname
-      const wsUrl = `ws://${wsHost}:8080`; // Correctly formatted template literal
-      const ws = new WebSocket(wsUrl);
-      console.log(`WebSocket connecting to ${wsUrl}`);
-  
-      ws.onopen = () => {
-        console.log('Connected to WebSocket server');
-      };
-  
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('Received WebSocket data:', data);
-          // Check for both possible properties: "gyro" or "rotation"
-          if (
-            data.gyro &&
-            typeof data.gyro.x === 'number' &&
-            typeof data.gyro.y === 'number' &&
-            typeof data.gyro.z === 'number'
-          ) {
-            setGyro(data.gyro);
-          } else if (
-            data.rotation &&
-            typeof data.rotation.x === 'number' &&
-            typeof data.rotation.y === 'number' &&
-            typeof data.rotation.z === 'number'
-          ) {
-            setGyro(data.rotation);
-          }
-          // Update accel state if valid data is received
-          if (
-            data.accel &&
-            typeof data.accel.x === 'number' &&
-            typeof data.accel.y === 'number' &&
-            typeof data.accel.z === 'number'
-          ) {
-            setAccel(data.accel);
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+  useEffect(() => {
+    const wsUrl = (import.meta as any)?.env?.VITE_DRIVER_WS_URL as string | undefined;
+    if (!wsUrl) {
+      // No WebSocket configured; skip connecting to avoid console errors in development.
+      return;
+    }
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Check for both possible properties: "gyro" or "rotation"
+        if (
+          data.gyro &&
+          typeof data.gyro.x === 'number' &&
+          typeof data.gyro.y === 'number' &&
+          typeof data.gyro.z === 'number'
+        ) {
+          setGyro(data.gyro);
+        } else if (
+          data.rotation &&
+          typeof data.rotation.x === 'number' &&
+          typeof data.rotation.y === 'number' &&
+          typeof data.rotation.z === 'number'
+        ) {
+          setGyro(data.rotation);
         }
-      };
-  
-      ws.onclose = () => {
-        console.log('WebSocket connection closed');
-      };
-  
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-  
-      return () => {
-        ws.close();
-      };
-    }, []);
+        // Update accel state if valid data is received
+        if (
+          data.accel &&
+          typeof data.accel.x === 'number' &&
+          typeof data.accel.y === 'number' &&
+          typeof data.accel.z === 'number'
+        ) {
+          setAccel(data.accel);
+        }
+      } catch {
+        // swallow parse errors to avoid noisy console
+      }
+    };
+
+    ws.onerror = () => {
+      // suppress socket errors to keep console clean
+    };
+    ws.onclose = () => {
+      // closed
+    };
+
+    return () => {
+      try { ws.close(); } catch {}
+    };
+  }, []);
   const lastAccelToastTime = useRef<number>(0);
   // useEffect to check for high acceleration events (magnitude > 20 m/s²)
   useEffect(() => {

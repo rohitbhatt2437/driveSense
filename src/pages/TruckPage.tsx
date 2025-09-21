@@ -1,5 +1,5 @@
-// src/pages/TruckPage.jsx
-import React, { useState, useEffect } from 'react';
+// src/pages/TruckPage.tsx
+import React, { useState, useEffect, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import TruckModel from '../components/TruckModel';
@@ -10,19 +10,22 @@ const TruckPage = () => {
   const [accel, setAccel] = useState({ x: 0, y: 0, z: 0 });
 
   useEffect(() => {
-    const wsHost = window.location.hostname; // Get the current hostname
-    const wsUrl = `ws://${wsHost}:41234`; // Correctly formatted template literal
-    const ws = new WebSocket(wsUrl);
-    console.log(`WebSocket connecting to ${wsUrl}`);
+    // Prefer configured URL; skip connecting if not provided to avoid console errors in development.
+    const envUrl = (import.meta as any)?.env?.VITE_TRUCK_WS_URL as string | undefined;
+    if (!envUrl) {
+      // No WebSocket URL configured; do not attempt to connect.
+      return;
+    }
+    const ws = new WebSocket(envUrl);
+    // console.log(`WebSocket connecting to ${envUrl}`);
 
     ws.onopen = () => {
-      console.log('Connected to WebSocket server');
+      // console.log('Connected to WebSocket server');
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('Received WebSocket data:', data);
         // Check for both possible properties: "gyro" or "rotation"
         if (
           data.gyro &&
@@ -49,37 +52,43 @@ const TruckPage = () => {
           setAccel(data.accel);
         }
       } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
+        // swallow parse errors to avoid noisy console in development
       }
     };
 
     ws.onclose = () => {
-      console.log('WebSocket connection closed');
+      // connection closed
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    ws.onerror = () => {
+      // suppress WebSocket errors in UI console
     };
 
     return () => {
-      ws.close();
+      try { ws.close(); } catch {}
     };
   }, []);
 
   return (
-    <Canvas
-      style={{ width: '83.68vw', height: '70vh', backgroundColor: 'lightblue', borderRadius: 12 }}
-      camera={{ position: [-500, 150, 0], fov: 90 }}
-    >
-      {/* Basic lighting */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
+    <div className="w-full bg-[#add8e6] rounded-xl overflow-hidden h-[65vh] sm:h-[60vh] md:h-[65vh] lg:h-[70vh]">
+      <Canvas
+        className="w-full h-full"
+        camera={{ position: [0, 1.6, 6], fov: 55, near: 0.1, far: 1000 }}
+        dpr={[1, 2]}
+      >
+        {/* Basic lighting */}
+        <hemisphereLight intensity={0.45} groundColor={0x444444} />
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[5, 8, 5]} intensity={1} castShadow />
 
-      {/* Pass the gyro state to TruckModel */}
-      <TruckModel gyro={gyro} />
+        {/* Truck model with fallback while GLB loads */}
+        <Suspense fallback={null}>
+          <TruckModel gyro={gyro} />
+        </Suspense>
 
-      <OrbitControls />
-    </Canvas>
+        <OrbitControls enablePan={false} minDistance={2} maxDistance={12} />
+      </Canvas>
+    </div>
   );
 };
 

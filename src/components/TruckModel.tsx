@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, Center } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface TruckModelProps {
@@ -14,8 +14,8 @@ const TruckModel: React.FC<TruckModelProps> = ({ gyro }) => {
   // Cast the returned scene from useGLTF to a THREE.Group type
   const { scene } = useGLTF('/truck2.glb') as { scene: THREE.Group };
 
-  // Optionally adjust the model’s scale and position
-  scene.scale.set(1, 1, 1);
+  // Optionally adjust the model’s base orientation
+  scene.rotation.set(0, 0, 0);
   scene.position.set(0, 0, 0);
 
   // Update the truck's rotation using the gyro data each frame
@@ -27,7 +27,14 @@ const TruckModel: React.FC<TruckModelProps> = ({ gyro }) => {
     }
   });
 
-  return <primitive object={scene} ref={truckRef} dispose={null} />;
+  return (
+    <Center position={[0, -0.5, 0]} disableZ>
+      <primitive object={scene} ref={truckRef} dispose={null} scale={2.2} />
+    </Center>
+  );
 };
+
+// Preload the GLB for faster first render
+useGLTF.preload('/truck2.glb');
 
 export default TruckModel;

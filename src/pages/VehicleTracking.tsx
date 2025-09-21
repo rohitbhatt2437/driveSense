@@ -1,10 +1,10 @@
 import React from 'react'
-import MapView from '../components/map-view'
+import MapboxView from '../components/MapboxView'
 
 const VehicleTracking = () => {
   return (
-    <div className='p-4' >
-        <MapView/>
+    <div className='p-0 md:p-4'>
+      <MapboxView/>
     </div>
   )
 }

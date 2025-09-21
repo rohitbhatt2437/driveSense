@@ -40,8 +40,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className={`relative border-r bg-white text-black h-screen pt-8 transition-all duration-300 ${isMinimized ? 'w-20' : 'w-64'
-        }`}
+      className={`relative border-r bg-white text-black h-screen pt-8 transition-all duration-300 ${isMinimized ? 'w-20' : 'w-64'} hidden md:block`}
     >
       {/* Toggle Button in the top-right corner */}
       <div
